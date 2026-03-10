@@ -55,8 +55,6 @@ class TestGamma:
         assert np.all(np.isfinite(ll))
 
     def test_log_likelihood_negative(self):
-        # Log-likelihood per observation is typically negative for small data
-        # but can be positive — just check it's finite
         ll = self.fam.log_likelihood(self.y, self.params)
         assert np.all(np.isfinite(ll))
 
@@ -71,7 +69,7 @@ class TestGamma:
     def test_dl_deta_mu_matches_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "mu")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "mu")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-6)
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-8)
 
     def test_dl_deta_sigma_matches_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "sigma")
@@ -123,12 +121,12 @@ class TestLogNormal:
     def test_dl_deta_mu_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "mu")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "mu")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-5)
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-5, atol=1e-8)
 
     def test_dl_deta_sigma_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "sigma")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "sigma")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-4)
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-8)
 
     def test_d2l_deta2_positive(self):
         for pname in ["mu", "sigma"]:
@@ -139,16 +137,21 @@ class TestLogNormal:
         sv = self.fam.starting_values(self.y)
         assert np.all(sv["sigma"] > 0)
 
+    def test_unknown_param_raises(self):
+        with pytest.raises(ValueError):
+            self.fam.dl_deta(self.y, self.params, "kappa")
+
 
 class TestInverseGaussian:
     fam = InverseGaussian()
     rng = np.random.default_rng(3)
-    # scipy invgauss: mu = mu/lam, scale = lam
+    # scipy invgauss: mu_param = mu/lambda, scale = lambda
+    # With lambda=100, mu=100: y ~ IG(mu=100, sigma=0.1) approx
     from scipy import stats as _stats
     y = _stats.invgauss(mu=1.0, scale=100.0).rvs(50, random_state=3)
     params = {
         "mu": np.full(50, 100.0),
-        "sigma": np.full(50, 0.3),
+        "sigma": np.full(50, 0.1),
     }
 
     def test_param_names(self):
@@ -161,17 +164,21 @@ class TestInverseGaussian:
     def test_dl_deta_mu_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "mu")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "mu")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-4)
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-6)
 
     def test_dl_deta_sigma_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "sigma")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "sigma")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-4)
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-6)
 
     def test_d2l_positive(self):
         for pname in ["mu", "sigma"]:
             w = self.fam.d2l_deta2(self.y, self.params, pname)
             assert np.all(w > 0)
+
+    def test_unknown_param_raises(self):
+        with pytest.raises(ValueError):
+            self.fam.dl_deta(self.y, self.params, "kappa")
 
 
 class TestPoisson:
@@ -187,7 +194,8 @@ class TestPoisson:
     def test_dl_deta_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "mu")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "mu")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-5)
+        # Use absolute tolerance: when y=mu, score=0 exactly, numerical≈0 with fp error
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-7)
 
     def test_d2l_positive(self):
         w = self.fam.d2l_deta2(self.y, self.params, "mu")
@@ -196,6 +204,10 @@ class TestPoisson:
     def test_starting_values(self):
         sv = self.fam.starting_values(self.y)
         assert np.all(sv["mu"] > 0)
+
+    def test_unknown_param_raises(self):
+        with pytest.raises(ValueError):
+            self.fam.dl_deta(self.y, self.params, "lambda")
 
 
 class TestNBI:
@@ -215,7 +227,8 @@ class TestNBI:
     def test_dl_deta_mu_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "mu")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "mu")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-4)
+        # Integer y data: use atol for near-zero cases
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-4, atol=1e-7)
 
     def test_dl_deta_sigma_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "sigma")
@@ -231,11 +244,14 @@ class TestNBI:
         sv = self.fam.starting_values(self.y)
         assert sv["sigma"][0] > 0
 
+    def test_unknown_param_raises(self):
+        with pytest.raises(ValueError):
+            self.fam.dl_deta(self.y, self.params, "nu")
+
 
 class TestZIP:
     fam = ZIP()
     rng = np.random.default_rng(11)
-    # Generate ZIP data: 20% structural zeros
     n = 200
     is_zero = rng.uniform(size=n) < 0.2
     y_poisson = rng.poisson(lam=2.0, size=n).astype(float)
@@ -250,21 +266,20 @@ class TestZIP:
         assert np.all(np.isfinite(ll))
 
     def test_log_likelihood_zero_obs(self):
-        # P(Y=0) = pi + (1-pi)*exp(-mu) > 0
         y0 = np.array([0.0])
         p0 = {"mu": np.array([2.0]), "pi": np.array([0.3])}
         ll = self.fam.log_likelihood(y0, p0)
-        assert ll[0] < 0  # log probability < 0
+        assert ll[0] < 0
 
     def test_dl_deta_mu_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "mu")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "mu")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-3, atol=1e-4)
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-3, atol=1e-6)
 
     def test_dl_deta_pi_numerical(self):
         analytical = self.fam.dl_deta(self.y, self.params, "pi")
         numerical = gradient_in_eta(self.fam, self.y, self.params, "pi")
-        np.testing.assert_allclose(analytical, numerical, rtol=1e-3, atol=1e-4)
+        np.testing.assert_allclose(analytical, numerical, rtol=1e-3, atol=1e-6)
 
     def test_d2l_positive(self):
         for pname in ["mu", "pi"]:
@@ -276,11 +291,14 @@ class TestZIP:
         assert 0 < sv["pi"][0] < 1
         assert sv["mu"][0] > 0
 
+    def test_unknown_param_raises(self):
+        with pytest.raises(ValueError):
+            self.fam.dl_deta(self.y, self.params, "nu")
+
 
 class TestTweedie:
     fam = Tweedie(power=1.5)
     rng = np.random.default_rng(13)
-    # Mix of zeros and positives
     n = 100
     y = np.where(rng.uniform(size=n) < 0.3, 0.0, rng.gamma(2.0, 500.0, n))
     params = {
@@ -316,3 +334,7 @@ class TestTweedie:
         for pname in ["mu", "phi"]:
             w = self.fam.d2l_deta2(self.y, self.params, pname)
             assert np.all(w > 0)
+
+    def test_unknown_param_raises(self):
+        with pytest.raises(ValueError):
+            self.fam.dl_deta(self.y, self.params, "sigma")

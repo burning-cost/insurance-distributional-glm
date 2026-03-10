@@ -189,6 +189,8 @@ class GamlssFamily(ABC):
         in the IRLS step.
 
         By chain rule: d(log L)/d(eta_k) = d(log L)/d(theta_k) * d(theta_k)/d(eta_k)
+
+        Raises ValueError for unknown param_name.
         """
 
     @abstractmethod
@@ -204,6 +206,8 @@ class GamlssFamily(ABC):
         Returns positive values (this is the negative expected second derivative).
         Used as IRLS weights. If analytic expectation is hard, use the observed
         Fisher information (negative of actual second derivative).
+
+        Raises ValueError for unknown param_name.
         """
 
     @abstractmethod
@@ -214,6 +218,14 @@ class GamlssFamily(ABC):
         Called once before the RS loop begins. Should be robust — moment
         estimates are fine here; precision doesn't matter much.
         """
+
+    def _check_param(self, param_name: str) -> None:
+        """Raise ValueError if param_name is not a known parameter."""
+        if param_name not in self.param_names:
+            raise ValueError(
+                f"Unknown parameter '{param_name}' for {self.__class__.__name__}. "
+                f"Known parameters: {self.param_names}"
+            )
 
     def validate_params(self, params: Dict[str, np.ndarray]) -> None:
         """Optional validation hook. Raise ValueError if params are out of range."""

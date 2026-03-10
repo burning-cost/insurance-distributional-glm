@@ -48,27 +48,23 @@ class Poisson(GamlssFamily):
         return xlogy(y, mu) - mu - gammaln(y + 1.0)
 
     def dl_deta(self, y, params, param_name):
+        self._check_param(param_name)
         mu = params["mu"]
-        link = self.default_links[param_name]
-
-        if param_name == "mu":
-            dl_dmu = (y - mu) / mu
-            dmu_deta = link.inverse_deriv(link.link(mu))
-            return dl_dmu * dmu_deta
-
-        raise ValueError(f"Unknown param: {param_name}")
+        link = self.default_links["mu"]
+        # d(ll)/d(mu) = (y - mu) / mu; with log link, d(mu)/d(eta) = mu
+        # so dl/d(eta) = (y - mu) / mu * mu = y - mu
+        dl_dmu = (y - mu) / mu
+        dmu_deta = link.inverse_deriv(link.link(mu))
+        return dl_dmu * dmu_deta
 
     def d2l_deta2(self, y, params, param_name):
+        self._check_param(param_name)
         mu = params["mu"]
-        link = self.default_links[param_name]
-
-        if param_name == "mu":
-            # E[-d^2 ll/d mu^2] = 1/mu
-            d2l_dmu2 = 1.0 / mu
-            dmu_deta = link.inverse_deriv(link.link(mu))
-            return d2l_dmu2 * dmu_deta**2
-
-        raise ValueError(f"Unknown param: {param_name}")
+        link = self.default_links["mu"]
+        # E[-d^2 ll/d mu^2] = 1/mu; with log link dmu/deta=mu: E[-d^2/deta^2] = mu^2/mu = mu
+        d2l_dmu2 = 1.0 / mu
+        dmu_deta = link.inverse_deriv(link.link(mu))
+        return d2l_dmu2 * dmu_deta**2
 
     def starting_values(self, y):
         mu_init = np.full(len(y), max(np.mean(y), 0.01))
@@ -113,21 +109,21 @@ class NBI(GamlssFamily):
         )
 
     def dl_deta(self, y, params, param_name):
+        self._check_param(param_name)
         mu = params["mu"]
         sigma = params["sigma"]
         k = 1.0 / sigma
-        link = self.default_links[param_name]
 
         if param_name == "mu":
+            link = self.default_links["mu"]
             # d(ll)/d(mu) = y/mu - (y+k)/(mu+k)
             dl_dmu = y / mu - (y + k) / (mu + k)
             dmu_deta = link.inverse_deriv(link.link(mu))
             return dl_dmu * dmu_deta
 
-        elif param_name == "sigma":
-            # d(ll)/d(k) = psi(y+k) - psi(k) + log(k/(k+mu)) + 1 - (y+k)/(k+mu)
-            # d(k)/d(sigma) = -1/sigma^2
+        else:  # sigma
             from scipy.special import digamma
+            link = self.default_links["sigma"]
             dl_dk = (
                 digamma(y + k)
                 - digamma(k)
@@ -140,30 +136,28 @@ class NBI(GamlssFamily):
             dsigma_deta = link.inverse_deriv(link.link(sigma))
             return dl_dsigma * dsigma_deta
 
-        raise ValueError(f"Unknown param: {param_name}")
-
     def d2l_deta2(self, y, params, param_name):
+        self._check_param(param_name)
         mu = params["mu"]
         sigma = params["sigma"]
         k = 1.0 / sigma
-        link = self.default_links[param_name]
 
         if param_name == "mu":
+            link = self.default_links["mu"]
             # E[-d^2 ll/d mu^2] = k/(mu*(mu+k))
             d2l_dmu2 = k / (mu * (mu + k))
             dmu_deta = link.inverse_deriv(link.link(mu))
             return d2l_dmu2 * dmu_deta**2
 
-        elif param_name == "sigma":
+        else:  # sigma
             from scipy.special import polygamma
+            link = self.default_links["sigma"]
             # E[-d^2 ll/d k^2] = polygamma(1, k) - 1/k - 1/(k+mu)
             d2l_dk2 = polygamma(1, k) - 1.0 / k - 1.0 / (k + mu)
             dk_dsigma = -1.0 / sigma**2
             d2l_dsigma2 = np.maximum(d2l_dk2 * dk_dsigma**2, 1e-8)
             dsigma_deta = link.inverse_deriv(link.link(sigma))
             return d2l_dsigma2 * dsigma_deta**2
-
-        raise ValueError(f"Unknown param: {param_name}")
 
     def starting_values(self, y):
         mu_val = max(np.mean(y), 0.01)
@@ -213,18 +207,16 @@ class ZIP(GamlssFamily):
         return np.where(y == 0, ll_zero, ll_pos)
 
     def dl_deta(self, y, params, param_name):
+        self._check_param(param_name)
         mu = params["mu"]
         pi = params["pi"]
         pi = np.clip(pi, 1e-10, 1 - 1e-10)
-        link = self.default_links[param_name]
 
-        # p0 = pi + (1-pi)*exp(-mu) = P(Y=0)
         p0 = pi + (1.0 - pi) * np.exp(-mu)
         p0 = np.clip(p0, 1e-300, None)
 
         if param_name == "mu":
-            # d(ll)/d(mu) for y=0: -(1-pi)*exp(-mu) / p0
-            # d(ll)/d(mu) for y>0: y/mu - 1
+            link = self.default_links["mu"]
             dl_dmu = np.where(
                 y == 0,
                 -(1.0 - pi) * np.exp(-mu) / p0,
@@ -233,9 +225,8 @@ class ZIP(GamlssFamily):
             dmu_deta = link.inverse_deriv(link.link(mu))
             return dl_dmu * dmu_deta
 
-        elif param_name == "pi":
-            # d(ll)/d(pi) for y=0: (1 - exp(-mu)) / p0
-            # d(ll)/d(pi) for y>0: -1/(1-pi)
+        else:  # pi
+            link = self.default_links["pi"]
             dl_dpi = np.where(
                 y == 0,
                 (1.0 - np.exp(-mu)) / p0,
@@ -244,37 +235,33 @@ class ZIP(GamlssFamily):
             dpi_deta = link.inverse_deriv(link.link(pi))
             return dl_dpi * dpi_deta
 
-        raise ValueError(f"Unknown param: {param_name}")
-
     def d2l_deta2(self, y, params, param_name):
+        self._check_param(param_name)
         mu = params["mu"]
         pi = params["pi"]
         pi = np.clip(pi, 1e-10, 1 - 1e-10)
-        link = self.default_links[param_name]
 
         p0 = pi + (1.0 - pi) * np.exp(-mu)
         p0 = np.clip(p0, 1e-300, None)
         exp_neg_mu = np.exp(-mu)
 
         if param_name == "mu":
-            # Observed second derivative (negative) — use as weights
+            link = self.default_links["mu"]
             d2_zero = -((1.0 - pi) * exp_neg_mu * p0 - ((1.0 - pi) * exp_neg_mu)**2) / p0**2
             d2_pos = -y / mu**2
             d2l_dmu2 = np.where(y == 0, -d2_zero, -d2_pos)
-            # Take absolute value and floor for numerical stability
             d2l_dmu2 = np.maximum(np.abs(d2l_dmu2), 1e-8)
             dmu_deta = link.inverse_deriv(link.link(mu))
             return d2l_dmu2 * dmu_deta**2
 
-        elif param_name == "pi":
+        else:  # pi
+            link = self.default_links["pi"]
             d2_zero = -((1.0 - exp_neg_mu) * p0 - (1.0 - exp_neg_mu)**2) / p0**2
             d2_pos = -1.0 / (1.0 - pi)**2
             d2l_dpi2 = np.where(y == 0, -d2_zero, -d2_pos)
             d2l_dpi2 = np.maximum(np.abs(d2l_dpi2), 1e-8)
             dpi_deta = link.inverse_deriv(link.link(pi))
             return d2l_dpi2 * dpi_deta**2
-
-        raise ValueError(f"Unknown param: {param_name}")
 
     def starting_values(self, y):
         prop_zero = np.mean(y == 0)
