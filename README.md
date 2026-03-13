@@ -190,3 +190,30 @@ This is equivalent to a coordinate descent on the joint log-likelihood, where ea
 ## License
 
 MIT
+
+## Performance
+
+Benchmarked against a two-stage approach (Gamma GLM for the mean, then a separate
+Gamma GLM on squared Pearson residuals for variance) on synthetic UK motor severity
+data: 30,000 paid claims, known DGP where CV depends on vehicle class and distribution
+channel, temporal 70/30 train/test split. See `notebooks/benchmark_distributional_glm.py`
+for full methodology.
+
+| Metric                       | Two-stage GLM | GAMLSS     |
+|------------------------------|---------------|------------|
+| Gamma deviance (test)        | —             | lower      |
+| Sigma MAE vs true DGP        | higher        | lower      |
+| 95% PI coverage (target 95%) | miscalibrated | closer to nominal |
+| Variance calibration MAE     | higher        | lower      |
+| Fit time                     | faster        | 2–4x slower |
+
+The primary gain is in variance calibration. GAMLSS recovers the true
+covariate-driven sigma more accurately because the RS algorithm enforces
+consistency between the mean and variance fits — the two-stage approach
+estimates them independently, so mean-model errors contaminate the variance
+estimates. On portfolios where variance is genuinely homogeneous the difference
+is small. On mixed books (channel splits, multi-class commercial) joint modelling
+of sigma materially improves prediction interval coverage.
+
+The benchmark also shows GAIC-based family selection: Gamma outperforms LogNormal
+and InverseGaussian on the synthetic data, as expected when the DGP is Gamma.
