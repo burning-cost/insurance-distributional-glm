@@ -1,5 +1,11 @@
 # insurance-distributional-glm
 
+[![PyPI](https://img.shields.io/pypi/v/insurance-distributional-glm)](https://pypi.org/project/insurance-distributional-glm/)
+[![Python](https://img.shields.io/pypi/pyversions/insurance-distributional-glm)](https://pypi.org/project/insurance-distributional-glm/)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
+[![License](https://img.shields.io/badge/license-BSD--3-blue)]()
+
+
 GAMLSS (Generalised Additive Models for Location, Scale and Shape) for insurance pricing in Python.
 
 ## The problem
