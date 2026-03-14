@@ -191,6 +191,15 @@ This is equivalent to a coordinate descent on the joint log-likelihood, where ea
 - Dunn, P.K. and Smyth, G.K. (1996). Randomized quantile residuals. *JCGS*, 5(3), 236-244.
 - Smyth, G.K. and Jørgensen, B. (2002). Fitting Tweedie's compound Poisson model to insurance claims data. *ASTIN Bulletin*, 32(1), 143-157.
 
+
+## Related Libraries
+
+| Library | What it does |
+|---------|-------------|
+| [insurance-distributional](https://github.com/burning-cost/insurance-distributional) | Parametric severity distributions — use when the full GAMLSS framework is not needed and fixed-sigma fits are adequate |
+| [insurance-dispersion](https://github.com/burning-cost/insurance-dispersion) | Double GLM for covariate-driven dispersion — simpler alternative using IRLS rather than the full RS algorithm |
+| [insurance-gam](https://github.com/burning-cost/insurance-gam) | Generalised Additive Models — smooth non-linear effects in the mean submodel before adding distributional parameters |
+
 ## License
 
 MIT
