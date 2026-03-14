@@ -100,7 +100,11 @@ DistributionalGLM — Gamma
 ## Exposure offsets
 
 ```python
+from insurance_distributional_glm import DistributionalGLM
+from insurance_distributional_glm.families import NBI
+
 # Exposure-weighted frequency model
+# df, claim_counts, policy_years, and new_df are your portfolio DataFrames/arrays.
 model = DistributionalGLM(family=NBI(), formulas={"mu": ["age_band"], "sigma": []})
 model.fit(df, claim_counts, exposure=policy_years)
 
