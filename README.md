@@ -185,6 +185,11 @@ This is equivalent to a coordinate descent on the joint log-likelihood, where ea
 
 **Why fix the power parameter p in Tweedie?** Profile likelihood over a grid of p values (say 1.2 to 1.8 in steps of 0.1) and pick the best. Treating p as a free parameter inside the RS loop causes numerical instability. We may add `fit_tweedie_power()` as a wrapper in a future version.
 
+
+## Databricks Notebook
+
+A ready-to-run Databricks notebook benchmarking this library against standard approaches is available in [burning-cost-examples](https://github.com/burning-cost/burning-cost-examples/blob/main/notebooks/insurance_distributional_glm_demo.py).
+
 ## References
 
 - Rigby, R.A. and Stasinopoulos, D.M. (2005). Generalised additive models for location, scale and shape. *JRSS-C*, 54(3), 507-554.
