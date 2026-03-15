@@ -42,6 +42,7 @@ dev = [
 Homepage = "https://github.com/burning-cost/insurance-distributional-glm"
 Repository = "https://github.com/burning-cost/insurance-distributional-glm"
 Issues = "https://github.com/burning-cost/insurance-distributional-glm/issues"
+Documentation = "https://github.com/burning-cost/insurance-distributional-glm#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/insurance_distributional_glm"]
