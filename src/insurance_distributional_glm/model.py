@@ -296,8 +296,15 @@ class DistributionalGLM:
         return dists
 
     def predict_mean(self, X, exposure: Optional[np.ndarray] = None) -> np.ndarray:
-        """E[Y|X] — convenience wrapper."""
-        return self.predict(X, parameter="mu", exposure=exposure)
+        """E[Y|X] — convenience wrapper.
+
+        For ZIP, E[Y] = (1-pi)*mu, not mu alone.
+        """
+        mu = self.predict(X, parameter="mu", exposure=exposure)
+        if self.family.__class__.__name__ == "ZIP":
+            pi = self.predict(X, parameter="pi")
+            return (1.0 - pi) * mu
+        return mu
 
     def predict_variance(self, X, exposure: Optional[np.ndarray] = None) -> np.ndarray:
         """
@@ -440,7 +447,7 @@ class DistributionalGLM:
         elif metric == "deviance":
             # Saturated model: each obs gets its own parameter
             ll_sat = self._saturated_loglik(y, param_arrays)
-            return float(2.0 * np.mean(ll_sat - ll))
+            return float(2.0 * np.sum(ll_sat - ll))
         elif metric == "crps":
             dists = self.predict_distribution(X, exposure=exposure)
             crps_vals = []

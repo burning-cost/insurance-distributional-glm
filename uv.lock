@@ -415,7 +415,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'plots'", specifier = ">=3.7" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "pandas", marker = "extra == 'pandas'", specifier = ">=2.0" },
-    { name = "polars", specifier = ">=0.20" },
+    { name = "polars", specifier = ">=1.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "scipy", specifier = ">=1.10" },

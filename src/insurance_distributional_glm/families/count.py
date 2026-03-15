@@ -152,10 +152,20 @@ class NBI(GamlssFamily):
         else:  # sigma
             from scipy.special import polygamma
             link = self.default_links["sigma"]
-            # E[-d^2 ll/d k^2] = polygamma(1, k) - 1/k - 1/(k+mu)
-            d2l_dk2 = polygamma(1, k) - 1.0 / k - 1.0 / (k + mu)
+            # Observed Fisher information per observation: -d^2 ll / d k^2
+            # d^2 ll / d k^2 = polygamma(1, y+k) - polygamma(1, k) - 1/k + 1/(k+mu) + (y-mu)/(k+mu)^2
+            # so -d^2 ll / d k^2 = polygamma(1, k) - polygamma(1, y+k) - 1/k + 1/(k+mu) + (mu-y)/(k+mu)^2
+            # Individual observations can give negative values; clip to floor before chain rule.
+            neg_d2l_dk2 = (
+                polygamma(1, k)
+                - polygamma(1, y + k)
+                - 1.0 / k
+                + 1.0 / (k + mu)
+                + (mu - y) / (k + mu) ** 2
+            )
+            neg_d2l_dk2 = np.maximum(neg_d2l_dk2, 1e-8)
             dk_dsigma = -1.0 / sigma**2
-            d2l_dsigma2 = np.maximum(d2l_dk2 * dk_dsigma**2, 1e-8)
+            d2l_dsigma2 = neg_d2l_dk2 * dk_dsigma**2
             dsigma_deta = link.inverse_deriv(link.link(sigma))
             return d2l_dsigma2 * dsigma_deta**2
 

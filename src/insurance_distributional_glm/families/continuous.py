@@ -320,24 +320,45 @@ class Tweedie(GamlssFamily):
     def _log_w(self, y: np.ndarray, phi: np.ndarray, p: float) -> np.ndarray:
         """
         Log of the Tweedie series sum W(y, phi, p) for y > 0.
-        Uses the Poisson-Gamma series approximation (Dunn & Smyth 2005).
+
+        Uses the compound Poisson-Gamma series from Dunn & Smyth (2005).
+        Each term j corresponds to a Poisson count of j severity events.
+
+        For fixed y > 0 the density is:
+          f(y) * exp(ll_front_inverse) = (1/y) * sum_j V_j
+        where:
+          V_j = lam^j * y^{j*alpha - 1} / (j! * scale^{j*alpha} * Gamma(j*alpha))
+          lam   = mu^{2-p} / (phi * (2-p))   [Poisson mean]
+          scale = phi * (p-1) * mu^{p-1}      [Gamma scale per event]
+          alpha = (2-p) / (p-1)               [> 0 for p in (1,2)]
+
+        The log-offset terms for lam and scale simplify to:
+          j*log(lam) - j*alpha*log(scale) = -j*log(phi*(2-p)) - j*alpha*log(phi*(p-1))
+        (the mu terms cancel because alpha*(p-1) = 2-p exactly).
+
+        Per-term log formula:
+          log(W_j) = (j*alpha - 1)*log(y) - gammaln(j*alpha) - gammaln(j+1)
+                     - j*log(phi*(2-p)) - j*alpha*log(phi*(p-1))
         """
         j_max = 50
-        alpha = (2.0 - p) / (1.0 - p)
+        alpha = (2.0 - p) / (p - 1.0)  # positive for p in (1, 2)
 
         y_flat = np.asarray(y, dtype=float).ravel()
         phi_flat = np.asarray(phi, dtype=float).ravel()
+
+        log_phi_2mp = np.log(phi_flat * (2.0 - p))
+        log_phi_pm1 = np.log(phi_flat * (p - 1.0))
+        log_y = np.log(np.maximum(y_flat, 1e-300))
 
         log_w = np.full(len(y_flat), -np.inf)
 
         for j in range(1, j_max + 1):
             log_term = (
-                j * np.log(np.maximum(y_flat, 1e-300))
+                (j * alpha - 1.0) * log_y
+                - gammaln(j * alpha)
                 - gammaln(j + 1)
-                - gammaln(-j * alpha)
-                + (-j * alpha) * np.log(phi_flat * (2.0 - p))
-                + j * np.log(p - 1.0)
-                - j * np.log(phi_flat * (2.0 - p))
+                - j * log_phi_2mp
+                - j * alpha * log_phi_pm1
             )
             m = np.maximum(log_w, log_term)
             finite = np.isfinite(m)
@@ -383,13 +404,22 @@ class Tweedie(GamlssFamily):
 
         if param_name == "mu":
             link = self.default_links["mu"]
-            d2l_dmu2 = mu**(1.0 - p) / phi
+            # E[-d^2 ll/d mu^2] = mu^{-p} / phi
+            # Derived: d^2ll/dmu^2 = -p*y*mu^{-p-1}/phi + (p-1)*mu^{-p}/phi
+            # Taking expectation with E[y]=mu: E[-d^2ll/dmu^2] = mu^{-p}/phi
+            d2l_dmu2 = mu ** (-p) / phi
             dmu_deta = link.inverse_deriv(link.link(mu))
             return d2l_dmu2 * dmu_deta**2
 
         else:  # phi
             link = self.default_links["phi"]
-            d2l_dphi2 = 1.0 / phi**2
+            # E[-d^2 ll/d phi^2] = 2 * mu^{2-p} / (phi^3 * (p-1) * (2-p))
+            # Derived: d^2ll/dphi^2 = 2*y*mu^{1-p}/((1-p)*phi^3) - 2*mu^{2-p}/((2-p)*phi^3)
+            # Taking expectation with E[y]=mu:
+            #   E[-d^2ll/dphi^2] = -2*mu^{2-p}/((1-p)*phi^3) + 2*mu^{2-p}/((2-p)*phi^3)
+            #                    = 2*mu^{2-p}/phi^3 * [1/(p-1) + 1/(2-p)]
+            #                    = 2*mu^{2-p}/(phi^3 * (p-1) * (2-p))
+            d2l_dphi2 = 2.0 * mu ** (2.0 - p) / (phi**3 * (p - 1.0) * (2.0 - p))
             dphi_deta = link.inverse_deriv(link.link(phi))
             return d2l_dphi2 * dphi_deta**2
 
