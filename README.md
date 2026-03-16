@@ -217,27 +217,19 @@ MIT
 
 ## Performance
 
-Benchmarked against a two-stage approach (Gamma GLM for the mean, then a separate
-Gamma GLM on squared Pearson residuals for variance) on synthetic UK motor severity
-data: 30,000 paid claims, known DGP where CV depends on vehicle class and distribution
-channel, temporal 70/30 train/test split. See `notebooks/benchmark_distributional_glm.py`
-for full methodology.
+Benchmarked against **standard Gamma GLM with constant phi** (statsmodels) on 25,000 synthetic UK motor severity claims. DGP: CV genuinely depends on vehicle class and distribution channel (vehicle D + broker has ~3x higher CV than vehicle A + direct). 70/30 train/test split. Post-Phase-98 fix numbers (Tweedie IRLS weights, gammaln, and d2l corrections applied). Full script: `benchmarks/benchmark_insurance_distributional_glm.py`.
 
-| Metric                       | Two-stage GLM | GAMLSS     |
-|------------------------------|---------------|------------|
-| Gamma deviance (test)        | —             | lower      |
-| Sigma MAE vs true DGP        | higher        | lower      |
-| 95% PI coverage (target 95%) | miscalibrated | closer to nominal |
-| Variance calibration MAE     | higher        | lower      |
-| Fit time                     | faster        | 2–4x slower |
+| Metric | Gamma GLM (constant phi) | GAMLSS (DistributionalGLM) |
+|--------|--------------------------|---------------------------|
+| Gamma deviance (test) | 0.2385 | 0.2385 |
+| 95% PI coverage (target 0.95) | 0.9387 | 0.9425 |
+| Sigma MAE vs true DGP | 0.1018 | 0.0059 |
+| Sigma correlation with true DGP | 0.000 | 0.998 |
+| Variance calibration MAE | n/a (constant sigma) | 0.100 |
+| Fit time (25k obs) | 0.41s | 0.39s |
 
-The primary gain is in variance calibration. GAMLSS recovers the true
-covariate-driven sigma more accurately because the RS algorithm enforces
-consistency between the mean and variance fits — the two-stage approach
-estimates them independently, so mean-model errors contaminate the variance
-estimates. On portfolios where variance is genuinely homogeneous the difference
-is small. On mixed books (channel splits, multi-class commercial) joint modelling
-of sigma materially improves prediction interval coverage.
+The headline result is the sigma recovery. The Gamma GLM assigns sigma=0.467 to every policy regardless of risk factors. GAMLSS recovers covariate-driven sigma with a correlation of 0.998 against the true DGP values — the model correctly learns that vehicle D broker policies have ~3x the CV of vehicle A direct policies.
 
-The benchmark also shows GAIC-based family selection: Gamma outperforms LogNormal
-and InverseGaussian on the synthetic data, as expected when the DGP is Gamma.
+Gamma deviance and PI coverage are close because on a 25k dataset with dense confounder structure, the mean model is well-identified by both approaches. The difference becomes material for capital modelling (where distributional shape matters more than mean fit) and for segment-level prediction intervals — a vehicle D broker policy deserves a wider interval than the pooled phi implies.
+
+Fit time is comparable: the RS algorithm converges in similar wall-clock time to a single Gamma GLM on this dataset size, because the per-iteration IRLS steps are cheap.
