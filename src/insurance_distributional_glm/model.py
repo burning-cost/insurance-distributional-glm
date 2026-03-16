@@ -337,11 +337,13 @@ class DistributionalGLM:
         Return coefficient relativities for a given parameter.
 
         For log-linked parameters (mu, sigma on most families):
-          relativity = exp(beta_j) / exp(beta_base)
-        where beta_base is the intercept.
+          - Intercept relativity = exp(beta_intercept) — the fitted baseline
+            on the response scale.
+          - All other term relativities = exp(beta_j) — the multiplicative
+            effect of a one-unit increase in that term on the response scale.
 
         For logit-linked parameters (pi in ZIP):
-          Returns odds ratios: exp(beta_j) / 1.
+          Returns odds ratios: exp(beta_j).
 
         Returns
         -------
@@ -453,11 +455,18 @@ class DistributionalGLM:
             crps_vals = []
             for dist, yi in zip(dists, y):
                 if dist is not None:
-                    # Monte Carlo CRPS approximation
-                    samples = dist.rvs(1000)
-                    crps_vals.append(np.mean(np.abs(samples - yi)) - 0.5 * np.mean(np.abs(
-                        samples[:500, None] - samples[None, 500:]
-                    )))
+                    # Monte Carlo CRPS approximation using the standard estimator:
+                    #   CRPS = E|X - y| - 0.5 * E|X - X'|
+                    # where X, X' are independent draws from the predicted distribution.
+                    # We draw n_samples and use a random split for the second term —
+                    # this avoids the O(n^2) full pairwise calculation and does not
+                    # depend on drawing exactly 1000 samples.
+                    n_samples = 500
+                    s1 = dist.rvs(n_samples)
+                    s2 = dist.rvs(n_samples)
+                    crps_vals.append(
+                        np.mean(np.abs(s1 - yi)) - 0.5 * np.mean(np.abs(s1 - s2))
+                    )
             return float(np.mean(crps_vals))
         else:
             raise ValueError(f"Unknown metric: {metric}. Use 'nll', 'deviance', or 'crps'.")

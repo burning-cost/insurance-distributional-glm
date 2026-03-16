@@ -127,7 +127,7 @@ def choose_distribution(
                 converged=mdl._converged,
                 model=mdl,
             ))
-        except Exception as e:
+        except (ValueError, ArithmeticError, np.linalg.LinAlgError) as e:
             if verbose:
                 print(f"  {fname} failed: {e}")
 

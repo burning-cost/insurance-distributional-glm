@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-distributional-glm"
-version = "0.1.1"
+version = "0.1.2"
 description = "GAMLSS (Generalised Additive Models for Location, Scale and Shape) for insurance pricing in Python"
 readme = "README.md"
 license = { text = "MIT" }

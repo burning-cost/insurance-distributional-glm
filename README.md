@@ -71,25 +71,25 @@ model.fit(df, y)
 model.summary()
 ```
 
-Output:
+Output (exact values depend on random seed and data):
 ```
 DistributionalGLM — Gamma
-  n = 999, loglik = -7412.3410
+  n = 1000, loglik = -7412.xxxx
   Converged: True
-  GAIC(2): 14840.6820
+  GAIC(2): 14840.xxxx
 
   Parameter: mu  (link: log)
   Term                            Coef
   --------------------------------------------
-  (Intercept)                  6.09483
-  age_band                     0.02341
-  vehicle_value                0.00001
+  (Intercept)                  ~6.09
+  age_band                     ~0.02
+  vehicle_value                ~0.00001
 
   Parameter: sigma  (link: log)
   Term                            Coef
   --------------------------------------------
-  (Intercept)                 -0.65734
-  age_band                     0.01204
+  (Intercept)                 ~-0.66
+  age_band                     ~0.01
 ```
 
 ## Families
