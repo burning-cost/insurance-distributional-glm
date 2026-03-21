@@ -9,6 +9,8 @@
 
 GAMLSS (Generalised Additive Models for Location, Scale and Shape) for insurance pricing in Python.
 
+**Blog post:** [GAMLSS in Python, Finally](https://burning-cost.github.io/2026/03/10/insurance-distributional-glm/)
+
 ## The problem
 
 Standard GLMs model E[Y|X] — the conditional mean. That's fine when you believe every risk with the same mean also has the same variance. But in motor insurance, a young driver and a middle-aged driver with identical expected claims can have dramatically different claim volatility. Your pricing should know the difference.
@@ -42,6 +44,8 @@ With matplotlib for diagnostic plots:
 ```bash
 pip install "insurance-distributional-glm[plots]"
 ```
+
+> 💬 Questions or feedback? Start a [Discussion](https://github.com/burning-cost/insurance-distributional-glm/discussions). Found it useful? A ⭐ helps others find it.
 
 ## Quick start
 
