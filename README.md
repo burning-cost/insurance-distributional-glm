@@ -37,12 +37,12 @@ log(sigma_i) = z_i^T beta_sigma      # CV depends on (possibly different) risk f
 ## Installation
 
 ```bash
-pip install insurance-distributional-glm
+uv add insurance-distributional-glm
 ```
 
 With matplotlib for diagnostic plots:
 ```bash
-pip install "insurance-distributional-glm[plots]"
+uv add "insurance-distributional-glm[plots]"
 ```
 
 > 💬 Questions or feedback? Start a [Discussion](https://github.com/burning-cost/insurance-distributional-glm/discussions). Found it useful? A ⭐ helps others find it.
@@ -165,7 +165,7 @@ from insurance_distributional_glm import quantile_residuals, worm_plot
 resids = quantile_residuals(model, df, y, seed=42)
 
 # Worm plot: detrended QQ plot, split by fitted mu quantile
-# Requires matplotlib: pip install "insurance-distributional-glm[plots]"
+# Requires matplotlib: uv add "insurance-distributional-glm[plots]"
 worm_plot(model, df, y, n_groups=4)
 ```
 
