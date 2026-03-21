@@ -32,7 +32,7 @@ from .selection import choose_distribution, gaic, SelectionResult
 from .diagnostics import quantile_residuals, worm_plot
 from . import families
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = [
     "DistributionalGLM",
