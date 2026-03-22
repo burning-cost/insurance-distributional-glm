@@ -208,6 +208,16 @@ A ready-to-run Databricks notebook benchmarking this library against standard ap
 - Smyth, G.K. and Jørgensen, B. (2002). Fitting Tweedie's compound Poisson model to insurance claims data. *ASTIN Bulletin*, 32(1), 143-157.
 
 
+
+## When not to use
+
+- **Point predictions only**: if your pricing process consumes only E[Y|X] and variance modelling adds no downstream value (no capital allocation, no risk loading, no interval outputs), a standard GLM is simpler and equally correct.
+- **Small portfolios (fewer than ~1,000 claims)**: the sigma submodel needs enough data to identify covariate effects on dispersion. Below this threshold, constant-dispersion GLM is more stable and less likely to overfit the variance structure.
+- **Pure claim frequency**: if your target is claim counts with no overdispersion concern, a standard Poisson GLM is the right tool. NBI adds a parameter that may not be justified on thin data.
+- **Regulatory interpretability is the binding constraint**: if your model must be explainable to a regulator or pricing committee who cannot engage with GAMLSS concepts, the overhead of justifying a two-submodel structure may outweigh the technical benefit.
+
+---
+
 ## Related Libraries
 
 | Library | What it does |
