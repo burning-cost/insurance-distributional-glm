@@ -21,6 +21,7 @@ designed for insurance pricing teams. Key design decisions:
 
 from __future__ import annotations
 
+import warnings
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -121,6 +122,7 @@ class DistributionalGLM:
             Intercept is always added automatically.
             If None: mu gets all columns, other parameters get intercept-only.
             If {'mu': [], 'sigma': []}: intercept-only for all parameters.
+            Keys must be valid parameter names for the chosen family.
         """
         self.family = family
         self.formulas = formulas
@@ -171,7 +173,7 @@ class DistributionalGLM:
         self._n = len(y)
         self._columns = _get_columns(X)
 
-        # Resolve formulas
+        # Resolve formulas — raises ValueError for unrecognised keys
         formulas = self._resolve_formulas()
 
         # Build design matrices
@@ -210,19 +212,42 @@ class DistributionalGLM:
         self._formulas = formulas
         self._fitted = True
 
-        if not converged and verbose:
-            print(f"Warning: RS algorithm did not converge in {max_iter} iterations.")
+        # P1 fix: always warn on non-convergence, regardless of verbose flag.
+        # Silently returning a non-converged model is a reliability hazard.
+        if not converged:
+            warnings.warn(
+                f"RS algorithm did not converge in {max_iter} iterations. "
+                "Results may be unreliable. Try increasing max_iter or checking "
+                "for near-collinear covariates.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
         return self
 
     def _resolve_formulas(self) -> Dict[str, List[str]]:
-        """Apply default formula logic if formulas is None."""
+        """Apply default formula logic if formulas is None.
+
+        Raises ValueError if the user-supplied formulas dict contains keys that
+        are not valid parameter names for this family. A silent fallback to
+        intercept-only would mask typos and produce misleading results.
+        """
         param_names = self.family.param_names
         if self.formulas is None:
             result = {}
             for i, pname in enumerate(param_names):
                 result[pname] = self._columns if i == 0 else []
             return result
+
+        # P1 fix: reject unrecognised formula keys rather than silently ignoring.
+        unknown_keys = set(self.formulas.keys()) - set(param_names)
+        if unknown_keys:
+            raise ValueError(
+                f"formulas contains keys not recognised by this family: "
+                f"{sorted(unknown_keys)}. "
+                f"Valid parameter names are: {param_names}."
+            )
+
         # Fill in missing params with intercept-only
         result = {}
         for pname in param_names:
@@ -298,10 +323,23 @@ class DistributionalGLM:
     def predict_mean(self, X, exposure: Optional[np.ndarray] = None) -> np.ndarray:
         """E[Y|X] — convenience wrapper.
 
+        For LogNormal, E[Y] = exp(mu + sigma^2/2), not exp(mu). This method
+        applies the log-normal moment correction automatically.
         For ZIP, E[Y] = (1-pi)*mu, not mu alone.
         """
+        family_name = self.family.__class__.__name__
+
+        if family_name == "LogNormal":
+            # P1 fix: apply moment correction for LogNormal.
+            # mu is the log-scale mean (identity link), sigma is log-scale SD.
+            # E[Y] = exp(mu + sigma^2/2) — the naive exp(mu) underestimates
+            # the mean by a factor of exp(-sigma^2/2).
+            mu = self.predict(X, parameter="mu", exposure=exposure)
+            sigma = self.predict(X, parameter="sigma")
+            return np.exp(mu + 0.5 * sigma**2)
+
         mu = self.predict(X, parameter="mu", exposure=exposure)
-        if self.family.__class__.__name__ == "ZIP":
+        if family_name == "ZIP":
             pi = self.predict(X, parameter="pi")
             return (1.0 - pi) * mu
         return mu

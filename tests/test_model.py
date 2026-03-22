@@ -544,3 +544,128 @@ class TestWeights:
             model_w.coefficients["mu"],
             atol=1e-4,
         )
+
+
+# ---------------------------------------------------------------------------
+# P0/P1 regression tests
+# ---------------------------------------------------------------------------
+
+class TestLogNormalPredictMean:
+    """P1: predict_mean() for LogNormal must include the sigma^2/2 correction."""
+
+    def test_mean_correction_applied(self):
+        """predict_mean should return exp(mu + sigma^2/2), not exp(mu).
+
+        For known mu and sigma, the difference is exp(sigma^2/2) - 1
+        which is ~28% for sigma=0.7. We verify the correction is applied
+        by fitting an intercept-only model and checking the mean.
+        """
+        rng = np.random.default_rng(42)
+        mu_true = 7.0
+        sigma_true = 0.7
+        n = 5000
+        y = np.exp(rng.normal(mu_true, sigma_true, n))
+
+        df = pl.DataFrame({"dummy": np.zeros(n)})
+        model = DistributionalGLM(
+            family=LogNormal(),
+            formulas={"mu": [], "sigma": []},
+        )
+        model.fit(df, y, max_iter=200)
+
+        # True E[Y] = exp(mu + sigma^2/2)
+        true_mean = np.exp(mu_true + 0.5 * sigma_true**2)
+        predicted_mean = model.predict_mean(df)
+
+        # Should be within 5% of true mean
+        np.testing.assert_allclose(predicted_mean[0], true_mean, rtol=0.05)
+
+    def test_mean_greater_than_exp_mu(self):
+        """For sigma > 0, predict_mean must be strictly greater than exp(mu)."""
+        rng = np.random.default_rng(7)
+        y = np.exp(rng.normal(6.0, 0.5, 300))
+        df = pl.DataFrame({"x": rng.normal(size=300)})
+        model = DistributionalGLM(
+            family=LogNormal(),
+            formulas={"mu": ["x"], "sigma": []},
+        )
+        model.fit(df, y, max_iter=200)
+
+        mu = model.predict(df, parameter="mu")
+        sigma = model.predict(df, parameter="sigma")
+        mean_hat = model.predict_mean(df)
+
+        # mean_hat should be exp(mu + sigma^2/2) > exp(mu)
+        np.testing.assert_array_less(np.exp(mu), mean_hat + 1e-10)
+
+
+class TestNonConvergenceWarning:
+    """P1: fit() must always warn on non-convergence, regardless of verbose."""
+
+    def test_warns_without_verbose(self):
+        """Non-convergence warning must fire even when verbose=False."""
+        rng = np.random.default_rng(0)
+        y = rng.gamma(2.0, 500.0, 50)
+        df = pl.DataFrame({"x": rng.normal(size=50)})
+        model = DistributionalGLM(
+            family=Gamma(),
+            formulas={"mu": ["x"], "sigma": []},
+        )
+        import warnings as _warnings
+        with _warnings.catch_warnings(record=True) as w:
+            _warnings.simplefilter("always")
+            model.fit(df, y, max_iter=1, verbose=False)  # force non-convergence
+        runtime_warnings = [x for x in w if issubclass(x.category, RuntimeWarning)]
+        assert len(runtime_warnings) >= 1
+        assert "converge" in str(runtime_warnings[0].message).lower()
+
+    def test_converged_no_warning(self):
+        """Converged model should produce no RuntimeWarning."""
+        rng = np.random.default_rng(1)
+        y = rng.gamma(4.0, 250.0, 500)
+        df = pl.DataFrame({"x": rng.normal(size=500)})
+        model = DistributionalGLM(
+            family=Gamma(),
+            formulas={"mu": ["x"], "sigma": []},
+        )
+        import warnings as _warnings
+        with _warnings.catch_warnings(record=True) as w:
+            _warnings.simplefilter("always")
+            model.fit(df, y, max_iter=200)
+        runtime_warnings = [x for x in w if issubclass(x.category, RuntimeWarning)]
+        assert len(runtime_warnings) == 0
+
+
+class TestResolveFormulasValidation:
+    """P1: _resolve_formulas must raise ValueError for unrecognised keys."""
+
+    def test_unknown_key_raises(self):
+        """A typo in the formulas key should raise, not silently fall back."""
+        rng = np.random.default_rng(0)
+        y = rng.gamma(2.0, 500.0, 50)
+        df = pl.DataFrame({"x": rng.normal(size=50)})
+        model = DistributionalGLM(
+            family=Gamma(),
+            formulas={"mu": ["x"], "dispersoin": []},  # typo
+        )
+        with pytest.raises(ValueError, match="not recognised"):
+            model.fit(df, y)
+
+    def test_valid_keys_accepted(self):
+        """Valid family parameter keys must be accepted without error."""
+        rng = np.random.default_rng(2)
+        y = rng.gamma(4.0, 250.0, 100)
+        df = pl.DataFrame({"x": rng.normal(size=100)})
+        model = DistributionalGLM(
+            family=Gamma(),
+            formulas={"mu": ["x"], "sigma": []},
+        )
+        model.fit(df, y, max_iter=50)  # should not raise
+
+    def test_none_formulas_accepted(self):
+        """formulas=None is the default and must always work."""
+        rng = np.random.default_rng(3)
+        y = rng.gamma(4.0, 250.0, 100)
+        df = pl.DataFrame({"x": rng.normal(size=100)})
+        model = DistributionalGLM(family=Gamma())
+        model.fit(df, y, max_iter=50)  # should not raise
